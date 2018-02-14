@@ -1,0 +1,13 @@
+[package]
+name = "soundvis"
+version = "0.1.0"
+authors = ["Andreas Rammhold <andreas@rammhold.de>"]
+
+[dependencies]
+pvoc = "0.1.4"
+gstreamer = "0.10.1"
+gstreamer-app = "0.10.1"
+failure = "0.1.1"
+failure_derive = "0.1.1"
+glib = "0.4.1"
+byte-slice-cast = "0.1.0"

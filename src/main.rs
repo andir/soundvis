@@ -3,7 +3,11 @@ extern crate gstreamer as gst;
 extern crate gstreamer_app as gst_app;
 extern crate failure;
 extern crate glib;
-extern crate pvoc;
+
+extern crate rustfft;
+extern crate num;
+extern crate apodize;
+
 #[macro_use]
 extern crate failure_derive;
 
@@ -17,7 +21,6 @@ use std::f64;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread::spawn;
 
-use std::sync::Arc;
 use std::sync::Mutex;
 use gst::Cast;
 use gst::BinExt;
@@ -25,6 +28,7 @@ use gst::ElementExt;
 
 //use std::error::Error as StdError;
 
+mod decoder;
 
 #[derive(Debug, Fail)]
 #[fail(display = "Received error from {}: {} (debug: {:?})", src, error, debug)]
@@ -112,16 +116,16 @@ fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gst::Pipeline, Error> {
 
                     return gst::FlowReturn::Error;
                 };
-
-                let sum: f64 = samples
-                    .iter()
-                    .map(|sample| {
-                        let f = f64::from(*sample); // / f64::from(i16::MAX);
-                        f * f
-                    })
-                    .sum();
+                // println!("len: {}", samples.len());
+                // let sum: f64 = samples
+                //     .iter()
+                //     .map(|sample| {
+                //         let f = f64::from(*sample); // / f64::from(i16::MAX);
+                //         f * f
+                //     })
+                //     .sum();
+                // println!("rms: {}", sum);
                 tx.send(Vec::from(samples));
-                println!("rms: {}", sum);
 
                 gst::FlowReturn::Ok
             })
@@ -162,24 +166,26 @@ fn main_loop(pipeline: gst::Pipeline) -> Result<(), Error> {
 }
 
 
-fn process_loop(rx: Receiver<Vec<u8>>) {
-    use pvoc::{PhaseVocoder, Bin};
-    let pvoc = PhaseVocoder::new(1, 44100.0, 256, 4);
+
+fn process_loop(rx: Receiver<Vec<f32>>) {
+    let sample_size = 441;
+    let dec = decoder::Decoder::new(44100.0, sample_size, 4);
     while let Ok(d) = rx.recv() {
-        let mut _output: Vec<Bin> = Vec::new();
-        let ds: &[u8] = &d;
-        let input: &[&[u8]] = &vec![ds];
-        let mut output = vec![&_output[..]][..];
-        pvoc.process(&input, &mut output, |channels: usize,
-         bins: usize,
-         input: &[Vec<Bin>],
-         output: &mut [Vec<Bin>]| {
-            for i in 0..channels {
-                for j in 0..bins {
-                    output[i][j] = input[i][j];
-                }
+        if d.len() != sample_size {
+            println!("sample_size {} is not expected size {}", d.len(), sample_size);
+            continue
+        }
+        let out = dec.to_bins(d);
+        for t in 0..out.len() {
+            let bins = &out[t];
+            println!("t: {}", t);
+            println!("freq:\t amp:");
+            for &bin in bins {
+                println!("{} {}", bin.freq, bin.amp);
             }
-        });
+        }
+
+        std::process::exit(1);
     }
 }
 

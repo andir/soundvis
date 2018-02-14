@@ -4,10 +4,13 @@ version = "0.1.0"
 authors = ["Andreas Rammhold <andreas@rammhold.de>"]
 
 [dependencies]
-pvoc = "0.1.4"
 gstreamer = "0.10.1"
 gstreamer-app = "0.10.1"
 failure = "0.1.1"
 failure_derive = "0.1.1"
 glib = "0.4.1"
 byte-slice-cast = "0.1.0"
+
+rustfft = "2.0.0"    # A mixed-radix FFT library.
+apodize = "0.2.0"    # iterators that yield generalized cosine, hanning, hamming, blackman, nuttall and triangular
+num = "0.1.42"       # A collection of numeric types and traits for Rust, including bigint, complex, rational, ran…

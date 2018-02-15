@@ -87,7 +87,7 @@ impl Decoder {
     {
         // shift around the ringbuffer & insert new data at end
         {
-            self.ring_buffer.rotate(input.len());
+            self.ring_buffer.rotate_left(input.len());
 
             let offset = self.ring_buffer.len() - input.len();
             for (i, v) in input.iter().map(|v| v.to_f64().unwrap()).enumerate() {

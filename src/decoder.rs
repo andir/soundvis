@@ -146,10 +146,8 @@ impl Decoder {
                 })
                 .collect();
 
-            // extract requests frequencies from tmp
-            let new_bins: Vec<f64> = self.freqs.iter().map(|v| tmp[*v as usize]).collect();
-
-            bins.extend(new_bins.iter());
+            // extract requests frequencies from tmp and add it to the bins
+            bins.extend(self.freqs.iter().map(|v| tmp[*v as usize]));
         }
 
         bins

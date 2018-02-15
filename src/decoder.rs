@@ -126,7 +126,7 @@ impl Decoder {
             }
 
             // apply fft on multiple workers, the amount of jobs is equal to the amount of elements in fft_in
-            self.ffts[k].process_multi(&mut fft_in[..element_count], &mut fft_out[..element_count]);
+            self.ffts[i].process_multi(&mut fft_in[..element_count], &mut fft_out[..element_count]);
 
             // post process fft values
             // we skip the first element (why??) and consume up to element_count elements from fft_out

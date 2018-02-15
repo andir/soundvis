@@ -1,6 +1,8 @@
+#![feature(slice_rotate)]
 #[macro_use]
 extern crate gstreamer as gst;
 extern crate gstreamer_app as gst_app;
+
 extern crate failure;
 extern crate glib;
 
@@ -29,6 +31,7 @@ use gst::ElementExt;
 //use std::error::Error as StdError;
 
 mod decoder;
+mod debug;
 
 #[derive(Debug, Fail)]
 #[fail(display = "Received error from {}: {} (debug: {:?})", src, error, debug)]
@@ -169,23 +172,26 @@ fn main_loop(pipeline: gst::Pipeline) -> Result<(), Error> {
 
 fn process_loop(rx: Receiver<Vec<f32>>) {
     let sample_size = 441;
-    let dec = decoder::Decoder::new(44100.0, sample_size, 4);
+    let mut dec = decoder::Decoder::new(44100.0, 7, 8, 15);
     while let Ok(d) = rx.recv() {
         if d.len() != sample_size {
             println!("sample_size {} is not expected size {}", d.len(), sample_size);
             continue
         }
         let out = dec.to_bins(d);
-        for t in 0..out.len() {
-            let bins = &out[t];
-            println!("t: {}", t);
-            println!("freq:\t amp:");
-            for &bin in bins {
-                println!("{} {}", bin.freq, bin.amp);
-            }
-        }
+        // for t in 0..out.len() {
+        //     let bins = &out[t];
+        //     println!("t: {}", t);
+        //     println!("freq:\t amp:");
+        //     for &bin in bins {
+        //         println!("{} {}", bin.freq, bin.amp);
+        //     }
+        // }
+        // debug::write_gnuplot_data(&format!("test-0.data", t), out, |&d| {
+        //     (d.freq, d.amp)
+        // });
 
-        std::process::exit(1);
+        // std::process::exit(1);
     }
 }
 

@@ -88,6 +88,7 @@ impl Decoder {
         for (i, v) in input.iter().map(|v| v.to_f64().unwrap()).enumerate() {
             self.ring_buffer[offset + i] = v;
         }
+        //self.to_bins(input)
     }
 
     pub fn to_bins<S>(&mut self, input: Vec<S>) -> Vec<f64>

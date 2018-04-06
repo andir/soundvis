@@ -142,7 +142,7 @@ fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gst::Pipeline, Error> {
                 //    })
                 //    .sum();
                 //println!("rms: {}", sum);
-                tx.send(Vec::from(samples));
+                tx.send(Vec::from(samples)).unwrap();
 
                 gst::FlowReturn::Ok
             })
@@ -182,30 +182,30 @@ fn main_loop(pipeline: gst::Pipeline) -> Result<(), Error> {
     Ok(())
 }
 
-
+const SAMPLING_DURATION: u64 = 16; // in milliseconds
 
 fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
-    let dec = simple_decoder::SimpleDecoder::new_simple();
-    let mut samples : Vec<f32> = vec![];
-    let mut previous_out : Vec<f32> = vec![];
-//    let mut socket = UdpSocket::bind("127.0.0.1:34254").unwrap();
+    let mut dec = simple_decoder::SimpleDecoder::new_simple();
+    let mut samples : Vec<f32> = vec![0.0; dec.sample_count];
+    let mut fresh_samples = 0;
+    let needed_samples = SAMPLING_DURATION as usize * dec.sample_rate / 1000;
+    let mut draw_time = std::time::Instant::now();
     while let Ok(d) = rx.recv() {
-
-        samples.extend(&d);
-
-        if samples.len() >= dec.sample_count {
-            let mut out = dec.decode(&samples[..dec.sample_count]);
-            //for (i, e) in previous_out.iter().enumerate() {
-            //    out[i] = (out[i] + e) / 2.;
-            //}
+        let elapsed = draw_time.elapsed();
+        //        samples.splice(bins_pos..bins_pos+self.freqs.len(), self.freqs.iter().map(|v| tmp[*v]));
+        let new = usize::min(d.len(), dec.sample_count);
+        fresh_samples += new;
+        samples.rotate_right(new);
+        samples.splice(..new, d.into_iter());
+        if elapsed <  std::time::Duration::from_millis(SAMPLING_DURATION) {
+            continue 
+        }
+        if fresh_samples >= needed_samples {
+            let s = &samples[..dec.sample_count];
+            let mut out = dec.decode(s);
             tx.send(out).unwrap();
-            samples.rotate_left(dec.sample_count);
-            //previous_out = out;
-//            for t in 0..out.len() {
-//                let bins = &out[t];
-//                print!("{} {}\t", dec.freqs[t], bins);
-//            }
-//            print!("\n")
+            fresh_samples = 0;
+            draw_time = std::time::Instant::now();
         }
     }
 }
@@ -275,7 +275,7 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
             let n = v / global_max;
             n
         }).collect();
-        println!("v: {:?} {}", sspec, sspec.len());
+        //println!("v: {:?} {}", sspec, sspec.len());
 
         let buf_tex = BufferTexture::new(&display, &sspec, BufferTextureType::Float);
         let buf_tex : BufferTexture<f32> = match buf_tex {

@@ -265,6 +265,8 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
         if max < 0.0 {
             max = 1.0;
         }
+
+        global_max *= 0.99;
         if global_max < max {
             global_max = max;
         }

@@ -18,14 +18,19 @@ pub struct SimpleDecoder {
 
 impl SimpleDecoder {
     pub fn new_simple() -> SimpleDecoder {
-        SimpleDecoder::new(512, 44100)
+        SimpleDecoder::new(2usize.pow(15), 44100)
     }
     pub fn new(sample_count: usize, sample_rate: usize) -> SimpleDecoder {
         let mut planner = rustfft::FFTplanner::new(false);
+        let kammer_ton = 440.0;
+        let num_outputs = 6 * 12;
+//        let simple_freqs = (0..sample_count).map(|v| { v * sample_rate / sample_count }).collect();
+        let complex_freqs = (0..num_outputs).map(|v| kammer_ton * 2.0_f64.powf(v as f64 / 12.0 - 3.0) / sample_rate as f64 * sample_count as f64).map(|v| v as usize).collect();
+        println!("complex_freqs: {:?}", complex_freqs);
         SimpleDecoder {
             sample_rate: sample_rate,
             sample_count: sample_count,
-            freqs: (0..sample_count).map(|v| { v * sample_rate / sample_count }).collect(),
+            freqs: complex_freqs,
             fft: planner.plan_fft(sample_count),
             window: apodize::hanning_iter(sample_count).collect(),
         }
@@ -47,11 +52,11 @@ impl SimpleDecoder {
             self.fft.process(&mut fft_in, &mut fft_out);
 
             // collect peak magnitude at each frequency
-            let mut spectrum = vec![0.0 as f32; self.freqs.len()/2];
+            let mut spectrum = vec![0.0 as f32; self.freqs.len()];
             for (i, val) in fft_out.iter().enumerate() {
                 let magnitude = (val.re.powi(2) + val.im.powi(2)).sqrt();
                 let freq = i * self.sample_rate / self.sample_count;
-                for n in 0..(self.freqs.len()/2) - 1 {
+                for n in 0..self.freqs.len() - 1 {
                    if freq >= self.freqs[n] && freq <= self.freqs[n+1] {
                        spectrum[n] = magnitude as f32;
                    }

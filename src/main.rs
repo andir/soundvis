@@ -195,12 +195,12 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
 
         if samples.len() >= dec.sample_count {
             let mut out = dec.decode(&samples[..dec.sample_count]);
-            for (i, e) in previous_out.iter().enumerate() {
-                out[i] = (out[i] + e) / 2.;
-            }
-            tx.send(out.clone()).unwrap();
+            //for (i, e) in previous_out.iter().enumerate() {
+            //    out[i] = (out[i] + e) / 2.;
+            //}
+            tx.send(out).unwrap();
             samples.rotate_left(dec.sample_count);
-            previous_out = out;
+            //previous_out = out;
 //            for t in 0..out.len() {
 //                let bins = &out[t];
 //                print!("{} {}\t", dec.freqs[t], bins);
@@ -259,21 +259,25 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let mut spec = spec_rx.recv().unwrap();
+    let mut global_max = 0.0;
     loop {
         let mut max = spec.iter().cloned().fold(0.0, f32::max);
         if max < 0.0 {
             max = 1.0;
         }
+        if global_max < max {
+            global_max = max;
+        }
         let sspec : Vec<f32> = spec.iter().map(|v| {
             if *v < 0.0 {
                 return 0.0;
             }
-            let n = v / max;
+            let n = v / global_max;
             n
         }).collect();
-        //println!("v: {:?} {}", sspec, max);
+        println!("v: {:?} {}", sspec, sspec.len());
 
-        let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
+        let buf_tex = BufferTexture::new(&display, &sspec, BufferTextureType::Float);
         let buf_tex : BufferTexture<f32> = match buf_tex {
             Ok(t) => t,
             Err(_) => return,

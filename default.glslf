@@ -13,29 +13,24 @@ vec3 hsv2rgb(vec3 c)
 }
 
 void main() {
-	float stretch = 1024.;
-	vec2 xy = v_position.xy * stretch;
-	xy += 0.5;
+	vec2 xy = v_position.xy;
+	xy.x += 1.0;
+	xy.x /= 2.0;
+
+	//xy += 0.5;
 
 	xy = vec2(abs(xy.x), abs(xy.y));
 	color = vec3(0., 0., 0.);
 
-	if (xy.x < stretch && xy.y < stretch) {
-		int size = textureSize(tex);
+	int size = textureSize(tex);
 
-		int p = int((size / stretch) * xy.x);
-		float val = abs(texelFetch(tex, p).x);
+	int p = int(size * xy.x);
+	float val = abs(texelFetch(tex, p).x);
 
-		if (xy.y < val * stretch) {
-			color = hsv2rgb(vec3(abs(sin(val + v_position.x)), 1.0, 1.0));
-			if (v_position.y < 0.) {
-				color -= 0.12;
-			} else {
-			//	color = 0.8 / color;
-			}
-//			color *= 1 / (stretch / xy.x);
-		} else {
-			color = vec3(0.1, 0.1, 0.1);
-		}
+	if (xy.y < val) {
+		color = vec3(float(p)/size, 0., xy.y);
+		//color = vec3(0.0, 0.0, 1.0);
+	} else {
+		color = vec3(0.1, 0.1, 0.1);
 	}
 }

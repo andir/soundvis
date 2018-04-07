@@ -20,16 +20,11 @@ extern crate glium;
 use glium::glutin::WindowBuilder;
 use glium::glutin;
 
-#[macro_use]
-extern crate failure_derive;
-
 extern crate byte_slice_cast;
 use byte_slice_cast::*;
 
 use failure::Error;
 
-use std::i16;
-use std::f64;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::thread::spawn;
 
@@ -38,27 +33,11 @@ use gst::Cast;
 use gst::BinExt;
 use gst::ElementExt;
 
-use std::net::UdpSocket;
-
-//use std::error::Error as StdError;
-
 mod lightsd;
 mod decoder;
 mod simple_decoder;
 mod debug;
 
-
-use std::convert::AsMut;
-
-#[derive(Debug, Fail)]
-#[fail(display = "Received error from {}: {} (debug: {:?})", src, error, debug)]
-struct ErrorMessage {
-    src: String,
-    error: String,
-    debug: Option<String>,
-    #[cause]
-    cause: glib::Error,
-}
 
 fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gst::Pipeline, Error> {
     gst::init()?;
@@ -164,7 +143,7 @@ fn main_loop(pipeline: gst::Pipeline) -> Result<(), Error> {
         use gst::MessageView;
         match msg.view() {
             MessageView::Eos(..) => break,
-            MessageView::Error(err) => {
+            MessageView::Error(_) => {
                 pipeline.set_state(gst::State::Null).into_result()?;
                 // Err(ErrorMessage {
                 //     src: err.get_src().map(|s| s.get_path_string()).unwrap_or_else(
@@ -232,16 +211,15 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
 }
 
 fn smoothing(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
-    let mut global_max = 0.0;
     let mut draw_time = std::time::Instant::now();
     let mut smooth_values = vec![];
     while let Ok(d) = rx.recv() {
         let elapsed = draw_time.elapsed();
-        smooth_values = d.zip(smooth_values.into_iter().chain(std::iter::repeat(0)))
-            .map(|(val, max)| if (val > max * 1.25) {
-                val
-            } else if (val < 0.75) {
-                0.08 * *(elapsed.subsec_millis() as f32 * 1000) * val
+        smooth_values = d.iter().zip(smooth_values.into_iter().chain(std::iter::repeat(0.0)))
+            .map(|(val, max)| if *val > max * 1.25 {
+                *val
+            } else if *val < 0.75 {
+                0.08 * (elapsed.subsec_nanos() as f32 * 1000000000.) * val
             } else {
                 max
             })
@@ -289,10 +267,10 @@ fn main() {
 
     let pipeline = create_pipeline(raw_tx).expect("A pipline to be created");
 
-    let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
+    let (spec_rx1, spec_rx2) = cloneing_receiver(processed_rx);
 
-    spawn(move || process_loop(raw_rx, processed_tx));
-    spawn(move || smoothing(processed_rx, smooth_processed_tx));
+    spawn(move || process_loop(smooth_processed_rx, processed_tx));
+    spawn(move || smoothing(raw_rx, smooth_processed_tx));
     spawn(move || visual(spec_rx1));
     spawn(move || led(spec_rx2, send_tx));
     spawn(move || lightsd::send("172.20.64.232:1337", send_rx));

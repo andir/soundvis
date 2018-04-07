@@ -10,6 +10,8 @@ extern crate rustfft;
 extern crate num;
 extern crate apodize;
 
+extern crate byteorder;
+
 use glium::Surface;
 
 #[macro_use]
@@ -40,6 +42,7 @@ use std::net::UdpSocket;
 
 //use std::error::Error as StdError;
 
+mod lightsd;
 mod decoder;
 mod simple_decoder;
 mod debug;
@@ -190,6 +193,7 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
     let mut fresh_samples = 0;
     let needed_samples = SAMPLING_DURATION as usize * dec.sample_rate / 1000;
     let mut draw_time = std::time::Instant::now();
+    let mut global_max = 0.0;
     while let Ok(d) = rx.recv() {
         let elapsed = draw_time.elapsed();
         //        samples.splice(bins_pos..bins_pos+self.freqs.len(), self.freqs.iter().map(|v| tmp[*v]));
@@ -198,11 +202,28 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
         samples.rotate_right(new);
         samples.splice(..new, d.into_iter());
         if elapsed <  std::time::Duration::from_millis(SAMPLING_DURATION) {
-            continue 
+            continue
         }
         if fresh_samples >= needed_samples {
             let s = &samples[..dec.sample_count];
             let mut out = dec.decode(s);
+
+            let mut max = out.iter().cloned().fold(0.0, f32::max);
+            if max < 0.0 {
+                max = 1.0;
+            }
+
+            global_max *= 0.99;
+            if global_max < max {
+                global_max = max;
+            }
+            let out : Vec<f32> = out.iter()
+                .map(|v| v / global_max)
+                .map(|v| v.log(10.0)/2.5 + 1.0)
+                .map(|v| { if v < 0.0 { 0.0 } else  { v }})
+                .collect();
+
+
             tx.send(out).unwrap();
             fresh_samples = 0;
             draw_time = std::time::Instant::now();
@@ -210,14 +231,49 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
     }
 }
 
+fn cloneing_receiver<T>(rx: Receiver<T>) -> (Receiver<T>, Receiver<T>)
+    where T: Clone + Send + 'static
+{
+    let (tx1, rx1) = channel();
+    let (tx2, rx2) = channel();
+
+    spawn(move || {
+        while let Ok(d) = rx.recv() {
+            tx1.send(d.clone()).unwrap();
+            tx2.send(d).unwrap();
+        }
+    });
+
+    (rx1, rx2)
+}
+
+fn led(rx: Receiver<Vec<f32>>, tx: Sender<Vec<(f32, f32, f32)>>) {
+    let led_count = 2200;
+    while let Ok(d) = rx.recv() {
+        // some magic!
+        let buf : Vec<(f32, f32, f32)> = d.iter().map(|v| ((360.0 *  v).abs(), 1.0, *v)).collect();
+        let mut b = vec![];
+        while b.len() < led_count {
+            b.extend(&buf);
+        }
+        tx.send(b).unwrap();
+    }
+}
+
 fn main() {
 
     let (raw_tx, raw_rx) = channel();
     let (spec_tx, spec_rx) = channel();
+    let (send_tx, send_rx) = channel();
 
     let pipeline = create_pipeline(raw_tx).expect("A pipline to be created");
+
+    let (spec_rx1, spec_rx2) = cloneing_receiver(spec_rx);
+
     spawn(move || process_loop(raw_rx, spec_tx));
-    spawn(move || visual(spec_rx));
+    spawn(move || visual(spec_rx1));
+    spawn(move || led(spec_rx2, send_tx));
+    spawn(move || lightsd::send("172.20.64.232:1337", send_rx));
     main_loop(pipeline).expect("Clean end.")
 
 }
@@ -259,27 +315,10 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let mut spec = spec_rx.recv().unwrap();
-    let mut global_max = 0.0;
     loop {
-        let mut max = spec.iter().cloned().fold(0.0, f32::max);
-        if max < 0.0 {
-            max = 1.0;
-        }
+                //println!("v: {:?} {}", sspec, sspec.len());
 
-        global_max *= 0.99;
-        if global_max < max {
-            global_max = max;
-        }
-        let sspec : Vec<f32> = spec.iter().map(|v| {
-            if *v < 0.0 {
-                return 0.0;
-            }
-            let n = v / global_max;
-            n
-        }).collect();
-        //println!("v: {:?} {}", sspec, sspec.len());
-
-        let buf_tex = BufferTexture::new(&display, &sspec, BufferTextureType::Float);
+        let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
         let buf_tex : BufferTexture<f32> = match buf_tex {
             Ok(t) => t,
             Err(_) => return,

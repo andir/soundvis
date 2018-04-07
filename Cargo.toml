@@ -15,3 +15,5 @@ glium = "0.20.0"                      # Elegant and safe OpenGL wrapper.  Glium 
 rustfft = "2.0.0"    # A mixed-radix FFT library.
 apodize = "0.2.0"    # iterators that yield generalized cosine, hanning, hamming, blackman, nuttall and triangular
 num = "0.1.42"       # A collection of numeric types and traits for Rust, including bigint, complex, rational, ran…
+byteorder = "1.2.2"            # Library for reading/writing numbers in big-endian and little-endian.
+

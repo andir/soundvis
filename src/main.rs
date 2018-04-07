@@ -198,8 +198,8 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
             }
             let out: Vec<f32> = out.iter()
                 .map(|v| v / global_max)
-                .map(|v| v.log(10.0) / 2.5 + 1.0)
-                .map(|v| if v < 0.0 { 0.0 } else { v })
+               // .map(|v| v.log(10.0) / 2.5 + 1.0)
+               // .map(|v| if v < 0.0 { 0.0 } else { v })
                 .collect();
 
 
@@ -216,12 +216,14 @@ fn smoothing(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
     while let Ok(d) = rx.recv() {
         let elapsed = draw_time.elapsed();
         smooth_values = d.iter().zip(smooth_values.into_iter().chain(std::iter::repeat(0.0)))
-            .map(|(val, max)| if *val > max * 1.25 {
+            .map(|(val, max)|
+                 if *val > max * 1.05 {
                 *val
             } else if *val < 0.75 {
-                0.08 * (elapsed.subsec_nanos() as f32 * 1000000000.) * val
-            } else {
-                max
+                0.09_f32.powf(elapsed.subsec_nanos() as f32 / 1000000000.0) * max
+//                0.9_f32.powf(elapsed.subsec_nanos() as f32 * 1000000000.) * max
+                } else {
+               max
             })
             .collect();
         tx.send(smooth_values.clone()).unwrap();
@@ -249,7 +251,9 @@ fn led(rx: Receiver<Vec<f32>>, tx: Sender<Vec<(f32, f32, f32)>>) {
     let led_count = 2200;
     while let Ok(d) = rx.recv() {
         // some magic!
-        let buf: Vec<(f32, f32, f32)> = d.iter().map(|v| ((360.0 * v).abs(), 1.0, *v)).collect();
+        let buf: Vec<(f32, f32, f32)> = d.iter().map(|v| ((v * 180.).abs(), 1.0, *v))
+            .map(|(h, s, v)| ( (180.0 + h), f32::max(s, 0.1), f32::max(v, 0.1)))
+            .collect();
         let mut b = vec![];
         while b.len() < led_count {
             b.extend(&buf);
@@ -267,10 +271,10 @@ fn main() {
 
     let pipeline = create_pipeline(raw_tx).expect("A pipline to be created");
 
-    let (spec_rx1, spec_rx2) = cloneing_receiver(processed_rx);
+    let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
 
-    spawn(move || process_loop(smooth_processed_rx, processed_tx));
-    spawn(move || smoothing(raw_rx, smooth_processed_tx));
+    spawn(move || process_loop(raw_rx, processed_tx));
+    spawn(move || smoothing(processed_rx, smooth_processed_tx));
     spawn(move || visual(spec_rx1));
     spawn(move || led(spec_rx2, send_tx));
     spawn(move || lightsd::send("172.20.64.232:1337", send_rx));

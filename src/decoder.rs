@@ -108,7 +108,7 @@ impl Decoder {
 
         // our "output",  we are awaiting self.num_bins bins in the output
         let mut bins: Vec<f64> = vec![0.0; self.windows.len() * self.freqs.len()];
-        let mut bins_pos : usize = 0;
+        let mut bins_pos: usize = 0;
 
         for (i, &(k, ref window)) in self.windows.iter().enumerate() {
             // element_count is the amount of items we should take a look at with the current window
@@ -150,7 +150,10 @@ impl Decoder {
                 .collect();
 
             // extract requests frequencies from tmp and add it to the bins
-            bins.splice(bins_pos..bins_pos+self.freqs.len(), self.freqs.iter().map(|v| tmp[*v]));
+            bins.splice(
+                bins_pos..bins_pos + self.freqs.len(),
+                self.freqs.iter().map(|v| tmp[*v]),
+            );
             bins_pos += self.freqs.len();
         }
 

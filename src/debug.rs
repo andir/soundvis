@@ -21,7 +21,7 @@ where
         let (x, y) = fun(&d);
         match file.write_fmt(format_args!("{} {}\n", x, y)) {
             Err(e) => panic!("Failed to format to file: {}", e),
-            Ok(_) => ()
+            Ok(_) => (),
         }
     }
     file.flush();

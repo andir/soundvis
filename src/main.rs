@@ -189,7 +189,7 @@ const SAMPLING_DURATION: u64 = 16; // in milliseconds
 
 fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
     let mut dec = simple_decoder::SimpleDecoder::new_simple();
-    let mut samples : Vec<f32> = vec![0.0; dec.sample_count];
+    let mut samples: Vec<f32> = vec![0.0; dec.sample_count];
     let mut fresh_samples = 0;
     let needed_samples = SAMPLING_DURATION as usize * dec.sample_rate / 1000;
     let mut draw_time = std::time::Instant::now();
@@ -201,8 +201,8 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
         fresh_samples += new;
         samples.rotate_right(new);
         samples.splice(..new, d.into_iter());
-        if elapsed <  std::time::Duration::from_millis(SAMPLING_DURATION) {
-            continue
+        if elapsed < std::time::Duration::from_millis(SAMPLING_DURATION) {
+            continue;
         }
         if fresh_samples >= needed_samples {
             let s = &samples[..dec.sample_count];
@@ -217,10 +217,10 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
             if global_max < max {
                 global_max = max;
             }
-            let out : Vec<f32> = out.iter()
+            let out: Vec<f32> = out.iter()
                 .map(|v| v / global_max)
-                .map(|v| v.log(10.0)/2.5 + 1.0)
-                .map(|v| { if v < 0.0 { 0.0 } else  { v }})
+                .map(|v| v.log(10.0) / 2.5 + 1.0)
+                .map(|v| if v < 0.0 { 0.0 } else { v })
                 .collect();
 
 
@@ -231,17 +231,37 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
     }
 }
 
+fn smoothing(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
+    let mut global_max = 0.0;
+    let mut draw_time = std::time::Instant::now();
+    let mut smooth_values = vec![];
+    while let Ok(d) = rx.recv() {
+        let elapsed = draw_time.elapsed();
+        smooth_values = d.zip(smooth_values.into_iter().chain(std::iter::repeat(0)))
+            .map(|(val, max)| if (val > max * 1.25) {
+                val
+            } else if (val < 0.75) {
+                0.08 * *(elapsed.subsec_millis() as f32 * 1000) * val
+            } else {
+                max
+            })
+            .collect();
+        tx.send(smooth_values.clone()).unwrap();
+        draw_time = std::time::Instant::now();
+    }
+}
+
+
 fn cloneing_receiver<T>(rx: Receiver<T>) -> (Receiver<T>, Receiver<T>)
-    where T: Clone + Send + 'static
+where
+    T: Clone + Send + 'static,
 {
     let (tx1, rx1) = channel();
     let (tx2, rx2) = channel();
 
-    spawn(move || {
-        while let Ok(d) = rx.recv() {
-            tx1.send(d.clone()).unwrap();
-            tx2.send(d).unwrap();
-        }
+    spawn(move || while let Ok(d) = rx.recv() {
+        tx1.send(d.clone()).unwrap();
+        tx2.send(d).unwrap();
     });
 
     (rx1, rx2)
@@ -251,7 +271,7 @@ fn led(rx: Receiver<Vec<f32>>, tx: Sender<Vec<(f32, f32, f32)>>) {
     let led_count = 2200;
     while let Ok(d) = rx.recv() {
         // some magic!
-        let buf : Vec<(f32, f32, f32)> = d.iter().map(|v| ((360.0 *  v).abs(), 1.0, *v)).collect();
+        let buf: Vec<(f32, f32, f32)> = d.iter().map(|v| ((360.0 * v).abs(), 1.0, *v)).collect();
         let mut b = vec![];
         while b.len() < led_count {
             b.extend(&buf);
@@ -263,14 +283,16 @@ fn led(rx: Receiver<Vec<f32>>, tx: Sender<Vec<(f32, f32, f32)>>) {
 fn main() {
 
     let (raw_tx, raw_rx) = channel();
-    let (spec_tx, spec_rx) = channel();
+    let (processed_tx, processed_rx) = channel();
     let (send_tx, send_rx) = channel();
+    let (smooth_processed_tx, smooth_processed_rx) = channel();
 
     let pipeline = create_pipeline(raw_tx).expect("A pipline to be created");
 
-    let (spec_rx1, spec_rx2) = cloneing_receiver(spec_rx);
+    let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
 
-    spawn(move || process_loop(raw_rx, spec_tx));
+    spawn(move || process_loop(raw_rx, processed_tx));
+    spawn(move || smoothing(processed_rx, smooth_processed_tx));
     spawn(move || visual(spec_rx1));
     spawn(move || led(spec_rx2, send_tx));
     spawn(move || lightsd::send("172.20.64.232:1337", send_rx));
@@ -292,7 +314,8 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
         &display,
         include_str!("../default.glslv"),
         include_str!("../default.glslf"),
-        None).unwrap();
+        None,
+    ).unwrap();
 
     #[derive(Copy, Clone)]
     struct Vertex {
@@ -316,31 +339,35 @@ fn visual(spec_rx: Receiver<Vec<f32>>) {
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let mut spec = spec_rx.recv().unwrap();
     loop {
-                //println!("v: {:?} {}", sspec, sspec.len());
+        //println!("v: {:?} {}", sspec, sspec.len());
 
         let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
-        let buf_tex : BufferTexture<f32> = match buf_tex {
+        let buf_tex: BufferTexture<f32> = match buf_tex {
             Ok(t) => t,
             Err(_) => return,
         };
         let mut target = display.draw();
         target.clear_color(0., 0., 0., 0.);
-        target.draw(&vertex_buffer,
-                        &glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
-                        &program,
-                        &uniform!{
+        target
+            .draw(
+                &vertex_buffer,
+                &glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList),
+                &program,
+                &uniform!{
                             tex: &buf_tex,
                         },
-                        &Default::default()).unwrap();
+                &Default::default(),
+            )
+            .unwrap();
         target.finish().unwrap();
-        events_loop.poll_events(|event| {
-            match event {
-                glutin::Event::WindowEvent { event, .. } => match event {
+        events_loop.poll_events(|event| match event {
+            glutin::Event::WindowEvent { event, .. } => {
+                match event {
                     glutin::WindowEvent::Closed => return,
-                    _ => ()
-                },
-                _ => (),
+                    _ => (),
+                }
             }
+            _ => (),
         });
         spec = spec_rx.recv().unwrap();
     }

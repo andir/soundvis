@@ -19,7 +19,7 @@ pub fn send(target: &str, rx: Receiver<Vec<(f32, f32, f32)>>) {
     let sock = UdpSocket::bind("[::]:12345").unwrap();
 
     while let Ok(d) = rx.recv() {
-        let bytes : Vec<u8> = encode(d);
+        let bytes: Vec<u8> = encode(d);
         sock.send_to(&bytes, target).unwrap();
     }
 }

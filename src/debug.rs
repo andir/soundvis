@@ -5,6 +5,7 @@ use std::fs::File;
 
 use std::io::Write;
 
+#[allow(dead_code)]
 pub fn write_gnuplot_data<F, T, O>(filename: &str, data: &[T], mut fun: F)
 where
     F: FnMut(&T) -> (O, O),
@@ -24,5 +25,5 @@ where
             Ok(_) => (),
         }
     }
-    file.flush();
+    file.flush().unwrap();
 }

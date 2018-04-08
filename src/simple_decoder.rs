@@ -1,6 +1,5 @@
 use rustfft;
-use num::{Float, Complex, ToPrimitive, FromPrimitive};
-use num;
+use num::Complex;
 use std::sync::Arc;
 use apodize;
 

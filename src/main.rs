@@ -247,26 +247,10 @@ where
     (rx1, rx2)
 }
 
-fn led(rx: Receiver<Vec<f32>>, tx: Sender<Vec<(f32, f32, f32)>>) {
-    let led_count = 2200;
-    while let Ok(d) = rx.recv() {
-        // some magic!
-        let buf: Vec<(f32, f32, f32)> = d.iter().map(|v| ((v * 180.).abs(), 1.0, *v))
-            .map(|(h, s, v)| ( (180.0 + h), f32::max(s, 0.1), f32::max(v, 0.1)))
-            .collect();
-        let mut b = vec![];
-        while b.len() < led_count {
-            b.extend(&buf);
-        }
-        tx.send(b).unwrap();
-    }
-}
-
 fn main() {
 
     let (raw_tx, raw_rx) = channel();
     let (processed_tx, processed_rx) = channel();
-    let (send_tx, send_rx) = channel();
     let (smooth_processed_tx, smooth_processed_rx) = channel();
 
     let pipeline = create_pipeline(raw_tx).expect("A pipline to be created");
@@ -276,8 +260,7 @@ fn main() {
     spawn(move || process_loop(raw_rx, processed_tx));
     spawn(move || smoothing(processed_rx, smooth_processed_tx));
     spawn(move || visual(spec_rx1));
-    spawn(move || led(spec_rx2, send_tx));
-    spawn(move || lightsd::send("172.20.64.232:1337", send_rx));
+    spawn(move || lightsd::leds("172.20.64.232:1337", spec_rx2));
     main_loop(pipeline).expect("Clean end.")
 
 }

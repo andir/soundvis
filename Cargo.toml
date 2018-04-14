@@ -3,6 +3,8 @@ name = "soundvis"
 version = "0.1.0"
 authors = ["Andreas Rammhold <andreas@rammhold.de>"]
 
+[build-dependencies]
+protoc-rust-grpc = "0.2.1"    # protoc --rust-grpc_out=... available as API. protoc needs to be in $PATH, protoc-gen-rust-grpc do…
 [dependencies]
 gstreamer = "0.10.1"
 gstreamer-app = "0.10.1"

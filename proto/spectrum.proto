@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+service Soundvis {
+  rpc StreamSpectrum(SpectrumRequest) returns (stream SpectrumResponse){}
+}
+
+message SpectrumRequest {
+}
+
+message Bin {
+  float freq = 1;
+  float value = 2;
+}
+
+message SpectrumResponse {
+  repeated Bin bins = 1;
+}

@@ -13,6 +13,6 @@ let
   libdir = lib.makeLibraryPath xdeps;
 in stdenv.mkDerivation {
   name = "soundvis";
-  buildInputs = [ openssl ] ++ (with gst_all_1; [ gst-plugins-base gst-plugins-good mypy ] ++ xdeps);
+  buildInputs = [ openssl ] ++ (with gst_all_1; [ gst-plugins-base gst-plugins-good protobuf ] ++ xdeps);
   LD_LIBRARY_PATH = libdir;
 }

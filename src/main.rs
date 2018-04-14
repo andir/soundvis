@@ -32,8 +32,8 @@ mod gst;
 
 const SAMPLING_DURATION: u64 = 16; // in milliseconds
 
-fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
-    let mut dec = simple_decoder::SimpleDecoder::new_simple();
+fn process_loop(n: usize, rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
+    let mut dec = simple_decoder::SimpleDecoder::new(2usize.pow(n as u32), 44100);
     let mut samples: Vec<f32> = vec![0.0; dec.sample_count];
     let mut fresh_samples = 0;
     let needed_samples = SAMPLING_DURATION as usize * dec.sample_rate / 1000;
@@ -67,7 +67,6 @@ fn process_loop(rx: Receiver<Vec<f32>>, tx: Sender<Vec<f32>>) {
                // .map(|v| v.log(10.0) / 2.5 + 1.0)
                // .map(|v| if v < 0.0 { 0.0 } else { v })
                 .collect();
-
 
             tx.send(out).unwrap();
             fresh_samples = 0;
@@ -113,20 +112,47 @@ where
     (rx1, rx2)
 }
 
+fn fanout_receiver<T>(rx: Receiver<T>, n: usize) -> Vec<Receiver<T>>
+where
+    T: Clone + Send + 'static + std::fmt::Debug
+{
+    //let channels: Vec<(Sender<T>, Receiver<T>)> = (0..n).map(|_| channel::<T>()).collect();
+
+    let mut tx_channels : Vec<Sender<T>> = Vec::new();
+    let mut rx_channels : Vec<Receiver<T>> = Vec::new();
+
+    for i in 0..n {
+        let (tx, rx) = channel();
+        tx_channels.push(tx);
+        rx_channels.push(rx);
+    }
+
+    spawn(move || while let Ok(d) = rx.recv() {
+        tx_channels.iter().map(|tx| tx.send(d.clone()).unwrap());
+    });
+
+    rx_channels
+}
+
 fn main() {
 
     let (raw_tx, raw_rx) = channel();
-    let (processed_tx, processed_rx) = channel();
-    let (smooth_processed_tx, smooth_processed_rx) = channel();
 
     let pipeline = gst::create_pipeline(raw_tx).expect("A pipline to be created");
 
-    let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
-
-    spawn(move || process_loop(raw_rx, processed_tx));
-    spawn(move || smoothing(processed_rx, smooth_processed_tx));
-    spawn(move || visual::visual(spec_rx1));
-    spawn(move || lightsd::leds("172.20.64.232:1337", spec_rx2));
+    //let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
+    let range = 12..14;
+    let receivers = fanout_receiver(raw_rx, range.len());
+    let start = range.start;
+    let _: Vec<()> = receivers.into_iter().enumerate().map(|(i, rx)| {
+        let (processed_tx, processed_rx) = channel();
+        let (smooth_processed_tx, smooth_processed_rx) = channel();
+        spawn(move || process_loop(start + i, rx, processed_tx));
+        spawn(move || smoothing(processed_rx, smooth_processed_tx));
+        spawn(move || visual::visual(smooth_processed_rx));
+        //spawn(move || lightsd::leds("172.20.64.232:1337", spec_rx2));
+        ()
+    }).collect();
     gst::gst_loop(pipeline).expect("Clean end.")
 }
 

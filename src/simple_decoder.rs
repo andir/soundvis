@@ -18,6 +18,7 @@ pub struct SimpleDecoder {
 }
 
 const PER_OCTAVE: usize = 48;
+const KAMMER_TON: f64 = 440.0;
 
 impl SimpleDecoder {
     pub fn new_simple() -> SimpleDecoder {
@@ -25,27 +26,25 @@ impl SimpleDecoder {
     }
     pub fn new(sample_count: usize, sample_rate: usize) -> SimpleDecoder {
         let mut planner = rustfft::FFTplanner::new(false);
-        let kammer_ton = 440.0;
 
         let num_outputs = 7 * PER_OCTAVE;
-        //        let simple_freqs = (0..sample_count).map(|v| { v * sample_rate / sample_count }).collect();
-        // let complex_freqs : Vec<f64> = (0..num_outputs).map(|v| kammer_ton * 2.0_f64.powf(v as f64 / PER_OCTAVE as f64 - 3.0) / sample_rate as f64 * sample_count as f64).collect();
-        //        let weights = complex_freqs.iter().map(|v| { let index = v.floor() as f64; (index as usize, 1.0-(v-index), v-index)}).filter(|&(v,_,_)| (v as usize)+1 < sample_count).collect();
         let complex_freqs = (0..num_outputs)
             .map(|v| {
-                (kammer_ton * 2.0_f64.powf(v as f64 / PER_OCTAVE as f64 - 3.0) /
+                (KAMMER_TON * 2.0_f64.powf(v as f64 / PER_OCTAVE as f64 - 3.0) /
                      sample_rate as f64 * sample_count as f64) as usize
             })
             .filter(|&v| v < sample_count)
             .collect();
 
-        //println!("weights: {:?}", weights);
+        let window = apodize::hanning_iter(sample_count).collect();
+        let fft = planner.plan_fft(sample_count);
+
         SimpleDecoder {
             sample_rate: sample_rate,
             sample_count: sample_count,
             freqs: complex_freqs,
-            fft: planner.plan_fft(sample_count),
-            window: apodize::hanning_iter(sample_count).collect(),
+            fft: fft,
+            window: window,
             fft_in: vec![c64::new(0.0, 0.0); sample_count],
             fft_out: vec![c64::new(0.0, 0.0); sample_count],
         }

@@ -44,7 +44,7 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>) {
     let mut spec = spec_rx.recv().unwrap();
     loop {
         //println!("v: {:?} {}", sspec, sspec.len());
-
+        println!("tex len: {}", spec.len());
         let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
         let buf_tex: BufferTexture<f32> = match buf_tex {
             Ok(t) => t,

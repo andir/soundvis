@@ -25,19 +25,10 @@ void main() {
 	int size = textureSize(tex);
 
 	int p = int(size * xy.x);
-//	float pval = abs(texelFetch(tex, p - 1).x);
 	float val = abs(texelFetch(tex, p).x);
-//	float nval = abs(texelFetch(tex, p + 1).x);
 
 	if (xy.y < val) {
 		color = vec3(float(p)/float(size), 0., xy.y);
-		//color = vec3(0.0, 0.0, 1.0);
-	//} else if (xy.y <= nval) {
-	//	color = vec3(float(p)/size, 0., xy.y);
-	//	color *= 0.8;
-	//} else if (xy.y <= pval) {
-	//	color = vec3(float(p)/size, 0., xy.y);
-	//	color *= 0.8;
 	} else {
 		color = vec3(1.0, 1.0, 1.0);
 	}

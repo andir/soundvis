@@ -17,8 +17,9 @@ pub struct SimpleDecoder {
     fft_out: Vec<c64>,
 }
 
-const PER_OCTAVE: usize = 48;
+const PER_OCTAVE: usize = 12;
 const KAMMER_TON: f64 = 440.0;
+const LOW_CUT:usize = 20;
 
 impl SimpleDecoder {
     pub fn new_simple() -> SimpleDecoder {
@@ -27,14 +28,16 @@ impl SimpleDecoder {
     pub fn new(sample_count: usize, sample_rate: usize) -> SimpleDecoder {
         let mut planner = rustfft::FFTplanner::new(false);
 
-        let num_outputs = 7 * PER_OCTAVE;
+        let num_outputs = 7 * PER_OCTAVE; // FIXME
         let complex_freqs = (0..num_outputs)
             .map(|v| {
                 (KAMMER_TON * 2.0_f64.powf(v as f64 / PER_OCTAVE as f64 - 3.0) /
                      sample_rate as f64 * sample_count as f64) as usize
             })
-            .filter(|&v| v < sample_count)
+            .filter(|&v| v < sample_count / 2) // Only the lower half of the result buffer contains the meaningful frequencies in the range(0, 22kHz).
             .collect();
+
+        println!("k: {}, freqs: {:?}", sample_count, complex_freqs);
 
         let window = apodize::hanning_iter(sample_count).collect();
         let fft = planner.plan_fft(sample_count);
@@ -65,10 +68,16 @@ impl SimpleDecoder {
         // collect peak magnitude at each frequency
         let mut spectrum = vec![0.0 as f32; self.freqs.len()];
         for (i, &index) in self.freqs.iter().enumerate() {
-            let val = self.fft_out[index];
-            let magnitude = val.norm_sqr().sqrt();
+            // cut off low frequencies
+            let magnitude = /*if index < LOW_CUT  { // FIXME: should it always be 20?
+                0.0
+            } else */{
+                let val = self.fft_out[1 + index];
+                val.norm_sqr().sqrt()
+            };
             spectrum[i] = magnitude as f32;
         }
+
         return spectrum;
     }
 }

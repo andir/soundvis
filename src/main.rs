@@ -28,8 +28,9 @@ mod simple_decoder;
 mod debug;
 mod visual;
 mod gst;
+mod beat;
 
-
+use beat::BeatDetector;
 
 fn normalize(input: Vec<f32>, global_max: f32) -> (Vec<f32>, f32) {
 let mut max = input.iter().cloned().fold(0.0, f32::max);
@@ -140,9 +141,28 @@ fn main() {
 
     let pipeline = gst::create_pipeline(raw_tx).expect("A pipline to be created");
 
-    //let (spec_rx1, spec_rx2) = cloneing_receiver(smooth_processed_rx);
+    // create a cloneing output so we can feed the raw samples into the beat detection
+    let (raw_rx1, raw_rx2) = cloneing_receiver(raw_rx);
+
+    let (beat_tx, beat_rx) = channel();
+
+    spawn(move || {
+        let mut b = beat::SimpleBeatDetector::new(44100);
+        while let Ok(d) = raw_rx1.recv() {
+            let v: bool = b.analyze(&d);
+            if v {
+                println!("BEAT");
+            }
+            match beat_tx.send(v) {
+                Ok(_) => (),
+                Err(e) => panic!("Failed to send bool: {:?}", e),
+            };
+        }
+    });
+
+    // for each window size create a dedicated receiver via our fanout function
     let range = 12..15;
-    let receivers = fanout_receiver(raw_rx, range.len());
+    let receivers = fanout_receiver(raw_rx2, range.len());
     let start = range.start;
     let mut processed_chans = Vec::new();
     receivers.into_iter().enumerate().map(|(i, rx)| {
@@ -169,7 +189,7 @@ fn main() {
         }
     });
     let (rx1, rx2) = cloneing_receiver(out_rx);
-    spawn(move || visual::visual(rx1));
+    spawn(move || visual::visual(rx1, beat_rx));
     spawn(move || lightsd::leds("172.20.64.232:1337",rx2));
     gst::gst_loop(pipeline).expect("Clean end.")
 }

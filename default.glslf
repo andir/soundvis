@@ -2,6 +2,7 @@
 out vec3 color;
 
 uniform samplerBuffer tex;
+uniform samplerBuffer beat;
 in vec4 v_position;
 
 
@@ -22,6 +23,8 @@ void main() {
 	xy = vec2(abs(xy.x), abs(xy.y));
 	color = vec3(0., 0., 0.);
 
+	float b = texelFetch(beat, 0).x;
+
 	int size = textureSize(tex);
 
 	int p = int(size * xy.x);
@@ -30,6 +33,10 @@ void main() {
 	if (xy.y < val) {
 		color = vec3(float(p)/float(size), 0., xy.y);
 	} else {
-		color = vec3(1.0, 1.0, 1.0);
+		if (b > 0.0) {
+			color = vec3(0.1, 0.1, 0.1);
+		} else {
+			color = vec3(1.0, 1.0, 1.0);
+		}
 	}
 }

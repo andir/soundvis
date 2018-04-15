@@ -4,7 +4,7 @@ use glium::glutin::WindowBuilder;
 use glium::glutin;
 use glium;
 
-pub fn visual(spec_rx: Receiver<Vec<f32>>) {
+pub fn visual(spec_rx: Receiver<Vec<f32>>, beat_rx: Receiver<bool>) {
     use glium::texture::buffer_texture::BufferTexture;
     use glium::texture::buffer_texture::BufferTextureType;
 
@@ -43,8 +43,15 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>) {
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let mut spec = spec_rx.recv().unwrap();
     loop {
-        //println!("v: {:?} {}", sspec, sspec.len());
-        println!("tex len: {}", spec.len());
+        let beat = beat_rx.recv().expect("Failed to retrieve beat bool");
+        let beat: Vec<f32> = if beat { vec![1.0] } else { vec![0.0] };
+        println!("beat: {:?}", beat);
+        let beat_tex = BufferTexture::new(&display, &beat, BufferTextureType::Float);
+        let beat_tex: BufferTexture<f32> = match beat_tex {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+
         let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
         let buf_tex: BufferTexture<f32> = match buf_tex {
             Ok(t) => t,
@@ -59,6 +66,7 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>) {
                 &program,
                 &uniform!{
                             tex: &buf_tex,
+                            beat: &beat_tex,
                         },
                 &Default::default(),
             )

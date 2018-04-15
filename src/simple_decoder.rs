@@ -37,8 +37,6 @@ impl SimpleDecoder {
             .filter(|&v| v < sample_count / 2) // Only the lower half of the result buffer contains the meaningful frequencies in the range(0, 22kHz).
             .collect();
 
-        println!("k: {}, freqs: {:?}", sample_count, complex_freqs);
-
         let window = apodize::hanning_iter(sample_count).collect();
         let fft = planner.plan_fft(sample_count);
 

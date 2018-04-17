@@ -19,7 +19,7 @@ pub struct SimpleDecoder {
 
 const PER_OCTAVE: usize = 12;
 const KAMMER_TON: f64 = 440.0;
-const LOW_CUT:usize = 20;
+const LOW_CUT: usize = 20;
 
 impl SimpleDecoder {
     pub fn new_simple() -> SimpleDecoder {

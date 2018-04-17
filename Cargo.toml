@@ -3,19 +3,20 @@ name = "soundvis"
 version = "0.1.0"
 authors = ["Andreas Rammhold <andreas@rammhold.de>"]
 
-[build-dependencies]
-protoc-rust-grpc = "0.2.1"    # protoc --rust-grpc_out=... available as API. protoc needs to be in $PATH, protoc-gen-rust-grpc do…
 [dependencies]
-gstreamer = "0.10.1"
-gstreamer-app = "0.10.1"
+threadpool = "1.0"
+apodize = "0.2.0"    # iterators that yield generalized cosine, hanning, hamming, blackman, nuttall and triangular
+byte-slice-cast = "0.1.0"
+byteorder = "1.2.2"            # Library for reading/writing numbers in big-endian and little-endian.
 failure = "0.1.1"
 failure_derive = "0.1.1"
+futures = "0.2.0"                      # An implementation of futures and streams featuring zero allocations, composability, and …
+futures-util = "0.2.0"        # Common utilities and extension traits for the futures-rs library.
+futures-executor = "0.2.0"        # Executors for asynchronous tasks based on the futures-rs library.
+num_cpus = "1.8.0"          # Get the number of CPUs on a machine.
 glib = "0.4.1"
-byte-slice-cast = "0.1.0"
 glium = "0.20.0"                      # Elegant and safe OpenGL wrapper.  Glium is an intermediate layer between OpenGL and your …
-
-rustfft = "2.0.0"    # A mixed-radix FFT library.
-apodize = "0.2.0"    # iterators that yield generalized cosine, hanning, hamming, blackman, nuttall and triangular
+gstreamer = "0.10.1"
+gstreamer-app = "0.10.1"
 num = "0.1.42"       # A collection of numeric types and traits for Rust, including bigint, complex, rational, ran…
-byteorder = "1.2.2"            # Library for reading/writing numbers in big-endian and little-endian.
-
+rustfft = "2.0.0"    # A mixed-radix FFT library.

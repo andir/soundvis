@@ -1,6 +1,5 @@
 
 pub trait BeatDetector {
-
     // feed samples into the detector and returns if a beat was detected within thos samples
     fn analyze(&mut self, samples: &[f32]) -> bool;
 }
@@ -18,7 +17,7 @@ impl SimpleBeatDetector {
     pub fn new(sample_rate: usize) -> Self {
         let needed_samples = sample_rate / 50;
         assert!(needed_samples != 0);
-        SimpleBeatDetector{
+        SimpleBeatDetector {
             sample_rate: sample_rate,
             needed_samples: needed_samples,
             fresh_samples: 0,
@@ -30,11 +29,14 @@ impl SimpleBeatDetector {
 
     fn analyze_samples(&mut self) -> bool {
         // compute power of newest needed_samples samples
-        let power = self.samples[..self.needed_samples].iter().map(|v| v.powi(2)).sum();
+        let power = self.samples[..self.needed_samples]
+            .iter()
+            .map(|v| v.powi(2))
+            .sum();
 
         // compute the reference power;
-        let sum : f32 = self.power_history.iter().sum();
-        let reference_level : f32 = sum * self.needed_samples as f32 / self.sample_rate as f32;
+        let sum: f32 = self.power_history.iter().sum();
+        let reference_level: f32 = sum * self.needed_samples as f32 / self.sample_rate as f32;
 
         // add new power level to history
         self.power_history.rotate_right(1);
@@ -58,15 +60,18 @@ impl BeatDetector for SimpleBeatDetector {
 
         // rotate samples right and add new samples to the beginning
         self.samples.rotate_right(samples.len());
-        self.samples.splice(..samples.len(), samples.iter().map(|v| *v));
+        self.samples.splice(
+            ..samples.len(),
+            samples.iter().map(|v| *v),
+        );
 
         // if there are enough new samples analyze and reset fresh counter
         if self.fresh_samples >= self.needed_samples {
             self.fresh_samples = 0;
             return self.analyze_samples();
-        } else { // otherwise just return false
-            return false
+        } else {
+            // otherwise just return false
+            return false;
         }
     }
 }
-

@@ -45,7 +45,6 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>, beat_rx: Receiver<bool>) {
     loop {
         let beat = beat_rx.recv().expect("Failed to retrieve beat bool");
         let beat: Vec<f32> = if beat { vec![1.0] } else { vec![0.0] };
-        println!("beat: {:?}", beat);
         let beat_tex = BufferTexture::new(&display, &beat, BufferTextureType::Float);
         let beat_tex: BufferTexture<f32> = match beat_tex {
             Ok(t) => t,

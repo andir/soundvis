@@ -32,8 +32,11 @@ pub fn leds(target: &'static str, sample_rx: Receiver<Vec<f32>>) {
     spawn(move || send(target, rx));
     while let Ok(d) = sample_rx.recv() {
         // some magic!
-        let buf: Vec<(f32, f32, f32)> = d.iter().map(|v| ((v * 180.).abs(), 1.0, *v))
-            .map(|(h, s, v)| ( (180.0 + h), f32::max(s, 0.1), f32::max(v, 0.1)))
+        let buf: Vec<(f32, f32, f32)> = d.iter()
+            .map(|v| ((v * 180.).abs(), 1.0, *v))
+            .map(|(h, s, v)| {
+                ((180.0 + h), f32::max(s, 0.1), f32::max(v, 0.1))
+            })
             .collect();
         let mut b = vec![];
         while b.len() < led_count {
@@ -42,5 +45,3 @@ pub fn leds(target: &'static str, sample_rx: Receiver<Vec<f32>>) {
         tx.send(b).unwrap();
     }
 }
-
-

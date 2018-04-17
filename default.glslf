@@ -23,6 +23,16 @@ void main() {
 	xy = vec2(abs(xy.x), abs(xy.y));
 	color = vec3(0., 0., 0.);
 
+	vec2 linien = xy * 7;
+
+	for (int i = 0; i < 6; ++i) {
+		if (linien.x >= i+ 0.99 && linien.x <= i + 1.01) {
+			color = vec3(0.0, 0.0, 0.0);
+			return;
+		}
+	}
+
+
 	float b = texelFetch(beat, 0).x;
 
 	int size = textureSize(tex);

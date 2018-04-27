@@ -30,8 +30,6 @@ mod process;
 mod simple_decoder;
 mod visual;
 
-use beat::BeatDetector;
-
 fn normalize(input: Vec<f32>, global_max: f32) -> (Vec<f32>, f32) {
     let mut max = input.iter().cloned().fold(0.0, f32::max);
     if max < 0.0 {
@@ -153,9 +151,6 @@ fn main() {
         // create a thread pool to execute everything on
         let pool = ThreadPool::new(num_cpus::get_physical());
 
-        // create all the objects involved in processing our data
-        let beat_detector = Arc::new(Mutex::new(beat::SimpleBeatDetector::new(sample_rate)));
-
         // create all the fft processors
         let range = 8..14;
         let range_start = range.start;
@@ -168,28 +163,15 @@ fn main() {
         // new values
         let mut fft_cache : HashMap<usize, Vec<f32>> = HashMap::new();
 
-        let (beat_tx, beat_rx) = channel();
         let (out_tx, out_rx) = channel();
 
         let mut global_max = 0.0;
 
-        spawn(move || visual::visual(out_rx, beat_rx));
+        spawn(move || visual::visual(out_rx));
         // for each received sample frame
         while let Ok(d) = raw_rx.recv() {
             let now = std::time::Instant::now();
-            let (loop_beat_tx, loop_beat_rx) = channel();
             let (tx, rx) = channel();
-            // pass it to the beat detector as task
-            {
-                let beat_data = d.clone();
-                let btx = loop_beat_tx.clone();
-                let mut beat_detector = Arc::clone(&beat_detector);
-                pool.execute(move || {
-                    let mut beat_detector = beat_detector.lock().expect("Scheduled beat detector more than once");
-                    let d = beat_detector.analyze(&beat_data);
-                    btx.send(d).expect("Result channel must be open");
-                });
-            }
 
             // feed it into our fft processs loop
             //
@@ -233,13 +215,9 @@ fn main() {
             let (merged_bins, max) = normalize(bins, global_max);
             global_max = max;
 
-            //let beat: bool = loop_beat_rx.recv().unwrap_or(false).clone();
-
             // check if all the ffts did return results, if not pick the previous result of that
             // fft (if available)
             out_tx.send(merged_bins).unwrap();
-            beat_tx.send(false).unwrap();
-            println!("elapsed: {:?}", now.elapsed());
         }
     });
 

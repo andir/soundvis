@@ -3,11 +3,13 @@ use glium::Surface;
 use glium::glutin::WindowBuilder;
 use glium::glutin;
 use glium;
+use std::time;
 
-pub fn visual(spec_rx: Receiver<Vec<f32>>, beat_rx: Receiver<bool>) {
+pub fn visual(spec_rx: Receiver<Vec<f32>>) {
     use glium::texture::buffer_texture::BufferTexture;
     use glium::texture::buffer_texture::BufferTextureType;
 
+    let time  = time::Instant::now();
     let window = WindowBuilder::new()
         .with_title("soundvis".to_string())
         .with_dimensions(1024, 786);
@@ -43,13 +45,8 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>, beat_rx: Receiver<bool>) {
     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
     let mut spec = spec_rx.recv().unwrap();
     loop {
-        let beat = beat_rx.recv().expect("Failed to retrieve beat bool");
-        let beat: Vec<f32> = if beat { vec![1.0] } else { vec![0.0] };
-        let beat_tex = BufferTexture::new(&display, &beat, BufferTextureType::Float);
-        let beat_tex: BufferTexture<f32> = match beat_tex {
-            Ok(t) => t,
-            Err(_) => return,
-        };
+        let elapsed = time.elapsed();
+        let t = (elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1000000000.0) as f32;
 
         let buf_tex = BufferTexture::new(&display, &spec, BufferTextureType::Float);
         let buf_tex: BufferTexture<f32> = match buf_tex {
@@ -65,7 +62,7 @@ pub fn visual(spec_rx: Receiver<Vec<f32>>, beat_rx: Receiver<bool>) {
                 &program,
                 &uniform!{
                             tex: &buf_tex,
-                            beat: &beat_tex,
+                            time: t,
                         },
                 &Default::default(),
             )

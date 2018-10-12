@@ -1,4 +1,4 @@
-#![feature(slice_rotate)]
+//#![feature(slice_rotate)]
 extern crate apodize;
 extern crate byte_slice_cast;
 extern crate byteorder;

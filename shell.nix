@@ -2,7 +2,6 @@ with import <nixpkgs> {};
 let
   mypy = python3.withPackages (ps: [ ps.matplotlib ps.numpy ]);
   xdeps = with xorg; [
-    mesa
     libX11
     libXcursor
     libXrandr
@@ -10,9 +9,13 @@ let
     libxcb
     libXi
   ];
-  libdir = lib.makeLibraryPath xdeps;
+  libdir = lib.makeLibraryPath (xdeps ++ [ libGL ]);
 in stdenv.mkDerivation {
   name = "soundvis";
-  buildInputs = [ openssl ] ++ (with gst_all_1; [ gst-plugins-base gst-plugins-good protobuf ] ++ xdeps);
+  buildInputs = [
+    openssl libGL gdb
+  ] ++ (with gst_all_1; [
+    gst-plugins-base gst-plugins-good protobuf
+  ] ++ xdeps);
   LD_LIBRARY_PATH = libdir;
 }

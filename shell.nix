@@ -9,11 +9,11 @@ let
     libxcb
     libXi
   ];
-  libdir = lib.makeLibraryPath (xdeps ++ [ libGL ]);
+  libdir = lib.makeLibraryPath (xdeps ++ [ "/run/opengl-driver"  libGLU_combined ]);
 in stdenv.mkDerivation {
   name = "soundvis";
   buildInputs = [
-    openssl libGL gdb
+    openssl gdb
   ] ++ (with gst_all_1; [
     gst-plugins-base gst-plugins-good protobuf
   ] ++ xdeps);

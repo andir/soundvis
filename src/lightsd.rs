@@ -35,7 +35,7 @@ pub fn leds(target: &'static str, sample_rx: Receiver<Vec<f32>>) {
         let buf: Vec<(f32, f32, f32)> = d.iter()
             .map(|v| ((v * 180.).abs(), 1.0, *v))
             .map(|(h, s, v)| {
-                ((180.0 + h), f32::max(s, 0.1), f32::max(v, 0.1))
+                ((180.0 + h), f32::max(s, 0.4), f32::max(v, 0.4))
             })
             .collect();
         let mut b = vec![];

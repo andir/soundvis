@@ -13,9 +13,10 @@ pub fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gstreamer::Pipeline, Erro
     gstreamer::init()?;
 
     let gs = match gstreamer::parse_launch(
-        "pulsesrc !
-        appsink name=sink max-buffers=1 emit-signals=True
-            caps=audio/x-raw,format=F32LE,channels=1,rate=44100",
+        "pulsesrc blocksize=3288 !
+         appsink name=sink max-buffers=1 emit-signals=True
+         caps=audio/x-raw,format=F32LE,channels=1,rate=44100
+         ",
     ) {
         Ok(gs) => gs,
         Err(e) => {
@@ -36,7 +37,7 @@ pub fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gstreamer::Pipeline, Erro
 
     let tx = Mutex::new(tx);
 
-    appsink.set_callbacks(
+        appsink.set_callbacks(
         gstreamer_app::AppSinkCallbacks::new()
             .new_sample(move |appsink| {
                 let tx = if let Ok(tx) = tx.lock() {
@@ -93,7 +94,6 @@ pub fn create_pipeline(tx: Sender<Vec<f32>>) -> Result<gstreamer::Pipeline, Erro
                 //        f * f
                 //    })
                 //    .sum();
-                //println!("rms: {}", sum);
                 tx.send(Vec::from(samples)).unwrap();
 
                 gstreamer::FlowReturn::Ok

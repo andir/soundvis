@@ -29,6 +29,7 @@ mod lightsd;
 mod process;
 mod simple_decoder;
 mod visual;
+mod bench;
 
 fn normalize(input: Vec<f32>, global_max: f32) -> (Vec<f32>, f32) {
     let mut max = input.iter().cloned().fold(0.0, f32::max);
@@ -142,57 +143,95 @@ fn main() {
 
     // configure our gstreamer pipeline
     let pipeline = gst::create_pipeline(raw_tx).expect("A pipline to be created");
+    let (leds_tx, leds_rx) = channel();
 
+    spawn(move || lightsd::leds("172.20.64.232:1337", leds_rx));
+
+    let (out_tx, out_rx) = channel();
+    spawn(move || visual::visual(out_rx));
     // spawn a thread that handles all the processing of data and passes processed data onwards
     spawn(move || {
 
-        const sample_rate:usize = 44100;
+        const sample_rate: usize = 44100;
 
         // create a thread pool to execute everything on
-        let pool = ThreadPool::new(num_cpus::get_physical());
+        let pool = ThreadPool::new(num_cpus::get_physical() - 1);
 
         // create all the fft processors
         let range = 8..14;
         let range_start = range.start;
         let range_end = range.end;
 
-        let processors : Vec<(usize, Arc<Mutex<process::Processor>>)> = range.map(|k| (k, Arc::new(Mutex::new(process::Processor::new(k, sample_rate))))).collect();
+        let processors: Vec<(usize, Arc<Mutex<process::Processor>>)> = range
+            .map(|k| {
+                (
+                    k,
+                    Arc::new(Mutex::new(process::Processor::new(k, sample_rate))),
+                )
+            })
+            .collect();
 
         // cache the last result of an fft
         // this enables us to to updates even if just one fft reported
         // new values
-        let mut fft_cache : HashMap<usize, Vec<f32>> = HashMap::new();
+        let mut fft_cache: HashMap<usize, Vec<f32>> = HashMap::new();
 
-        let (out_tx, out_rx) = channel();
+        // let (beat_tx, beat_rx) = channel();
 
         let mut global_max = 0.0;
 
-        spawn(move || visual::visual(out_rx));
         // for each received sample frame
+        let mut frame_counter = 0;
+ //       let mut now = std::time::Instant::now();
         while let Ok(d) = raw_rx.recv() {
-            let now = std::time::Instant::now();
             let (tx, rx) = channel();
+//            println!("Elapsed {} {} {}", "recv", now.elapsed().subsec_nanos() / 1000, d.len());
+            //let (loop_beat_tx, loop_beat_rx) = channel();
+            // pass it to the beat detector as task
+            //{
+            //    let beat_data = d.clone();
+            //    let btx = loop_beat_tx.clone();
+            //    let mut beat_detector = Arc::clone(&beat_detector);
+            //    pool.execute(move || {
+            //        let mut beat_detector = beat_detector.lock().expect("Scheduled beat detector more than once");
+            //        let d = beat_detector.analyze(&beat_data);
+            //        btx.send(d).expect("Result channel must be open");
+            //    });
+            //}
 
             // feed it into our fft processs loop
             //
-            processors.iter().map(|(k, p)| (*k, Arc::clone(p))).map(|(k, p)|{
-                let d = d.clone();
-                let tx = tx.clone();
-                pool.execute(move || {
-                    let mut p = p.lock().expect("Processor scheduled more than once");
-                    tx.send((k, p.process(d))).expect("Result channel must be open");
-                });
-            }).last();
+            processors
+                .iter()
+                .map(|(k, p)| (*k, Arc::clone(p)))
+                .map(|(k, p)| {
+                    let d = d.clone();
+                    let tx = tx.clone();
+                    pool.execute(move || {
+                        let mut p = p.lock().expect("Processor scheduled more than once");
+                        tx.send((k, p.process(d))).expect(
+                            "Result channel must be open",
+                        );
+                    });
+                })
+                .last();
 
             // await all the ffts before continuing
-            let mut bins = vec![0.0;7*12];
-            let cached_results = rx.into_iter().map(|(k, r)|{
-                let r = r.map(
-                    |r| { fft_cache.insert(k, r.clone()); r}).unwrap_or_else(
-                    || fft_cache.get(&k).unwrap_or(&vec![0.0; 7 * 12]).clone());
-                (k, r)
-            }).take(processors.len());
-/*
+            let mut bins = vec![0.0; 7 * 12];
+            let cached_results = rx.into_iter()
+                .map(|(k, r)| {
+
+                    let r =
+                        r.map(|r| {
+                            fft_cache.insert(k, r.clone());
+                            r
+                        }).unwrap_or_else(
+                                || fft_cache.get(&k).unwrap_or(&vec![0.0; 7 * 12]).clone(),
+                            );
+                    (k, r)
+                })
+                .take(processors.len());
+            /*
             let merged_bins = cached_results.fold(bins, |bins, (k, r)|{
                 bins.into_iter().zip(r.into_iter())
                     .map(|(a, b)| a + b / factor).collect()
@@ -200,23 +239,25 @@ fn main() {
 */
             // k \in [8, 13] = range
             let no_of_points = bins.len();
-            cached_results.map(|(k,r)|{
-                debug_assert!(no_of_points == r.len());
-                let to = (range_end + 1 -k)*12;
-                let from = if k == range_end - 1 {
-                    0
-                } else {
-                    (range_end - k)*12
-                };
-                bins.splice(from..to, r.into_iter().skip(from).take(to-from));
-            }
-            ).count();
+            cached_results
+                .map(|(k, r)| {
+                    debug_assert!(no_of_points == r.len());
+                    let to = (range_end + 1 - k) * 12;
+                    let from = if k == range_end - 1 {
+                        0
+                    } else {
+                        (range_end - k) * 12
+                    };
+                    bins.splice(from..to, r.into_iter().skip(from).take(to - from));
+                })
+                .count();
 
             let (merged_bins, max) = normalize(bins, global_max);
             global_max = max;
 
             // check if all the ffts did return results, if not pick the previous result of that
             // fft (if available)
+            leds_tx.send(merged_bins.clone()).unwrap();
             out_tx.send(merged_bins).unwrap();
         }
     });

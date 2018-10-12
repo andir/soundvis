@@ -47,7 +47,7 @@ impl Processor {
 
         // if we are being called too often start skipping frames
         if elapsed < Duration::from_millis(SAMPLING_DURATION) {
-            return None
+            return None;
         }
 
         // if there are enough new samples do all the expensive stuff

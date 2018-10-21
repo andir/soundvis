@@ -29,7 +29,7 @@ mod lightsd;
 mod process;
 mod simple_decoder;
 mod visual;
-mod bench;
+mod tcp;
 
 fn normalize(input: Vec<f32>, global_max: f32) -> (Vec<f32>, f32) {
     let mut max = input.iter().cloned().fold(0.0, f32::max);
